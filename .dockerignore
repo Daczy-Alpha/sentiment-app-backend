@@ -1,0 +1,7 @@
+.env
+venv/
+__pycache__/
+*.pyc
+financial_news.db
+.git
+.gitignore

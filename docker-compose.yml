@@ -1,0 +1,25 @@
+
+services:
+  api:
+    build: .
+    container_name: financial-news-api
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - sqlite_data:/app/data
+    restart: unless-stopped   
+
+  scheduler:
+    build: .
+    container_name: financial-news-scheduler
+    command: python scheduler.py
+    env_file:
+      - .env
+    volumes:
+      - sqlite_data:/app/data
+    restart: unless-stopped
+
+volumes:
+  sqlite_data:

@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+requests
+python-dotenv
+apscheduler
+transformers
+torch
+nest_asyncio

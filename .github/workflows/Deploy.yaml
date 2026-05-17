@@ -1,0 +1,44 @@
+name: CI-CD
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  continuous-integration:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_REGION: eu-north-1
+      ECR_REGISTRY: 487620625686.dkr.ecr.eu-north-1.amazonaws.com
+      ECR_REPOSITORY: sentiment-backend
+      IMAGE_TAG: ${{ github.run_number }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        run: |
+          aws configure set aws_access_key_id "${{ secrets.AWS_ACCESS_KEY_ID }}"
+          aws configure set aws_secret_access_key "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+          aws configure set default.region "$AWS_REGION"
+
+      - name: Login to Amazon ECR
+        run: |
+          aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+
+      - name: Build Docker image
+        run: |
+          docker build -t "$ECR_REPOSITORY:$IMAGE_TAG" .
+
+      - name: Tag Docker image
+        run: |
+          docker tag "$ECR_REPOSITORY:$IMAGE_TAG" "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          docker tag "$ECR_REPOSITORY:$IMAGE_TAG" "$ECR_REGISTRY/$ECR_REPOSITORY:latest"
+
+      - name: Push Docker image to ECR
+        run: |
+          docker push "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          docker push "$ECR_REGISTRY/$ECR_REPOSITORY:latest"
