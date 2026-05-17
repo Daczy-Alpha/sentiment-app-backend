@@ -36,7 +36,6 @@ jobs:
       - name: Tag Docker image
         run: |
           docker tag "$ECR_REPOSITORY:$IMAGE_TAG" "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
-          docker tag "$ECR_REPOSITORY:$IMAGE_TAG" "$ECR_REGISTRY/$ECR_REPOSITORY:latest"
 
       - name: Push Docker image to ECR
         run: |
