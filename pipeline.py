@@ -48,32 +48,39 @@ def score_headline(text: str) -> dict:
 
 
 def fetch_headlines() -> list:
-  """
-  Fetches financial headlines from NewsAPI and returns them as a list of dictionaries.
-  Args:
-    None
-  Returns:
-    A list of dictionaries containing the source name, headline, and published date.
-  """
-  response = requests.get(URL)
-  articles_data = response.json()["articles"]
+    response = requests.get(URL, timeout=20)
 
-  clean_articles = []
-  for article in articles_data:
-    title = article.get("title") # Get title first to check condition
-    if title is None or title == "N/A":
-      continue # Skip if title is None or "N/A"
+    print("NewsAPI status:", response.status_code)
+    print("NewsAPI response:", response.text[:500])
 
-    source_name = article.get("source", {}).get("name", "N/A")
-    published_at = article.get("publishedAt", "N/A")
+    data = response.json()
 
-    clean_articles.append({
-        "source": source_name,
-        "headline": title,
-        "published_at": published_at
-    })
-  return clean_articles
+    if response.status_code != 200:
+        print("NewsAPI request failed:", data)
+        return []
 
+    if "articles" not in data:
+        print("No articles key in NewsAPI response:", data)
+        return []
+
+    clean_articles = []
+
+    for article in data["articles"]:
+        title = article.get("title")
+
+        if title is None or title == "N/A":
+            continue
+
+        source_name = article.get("source", {}).get("name", "N/A")
+        published_at = article.get("publishedAt", "N/A")
+
+        clean_articles.append({
+            "source": source_name,
+            "headline": title,
+            "published_at": published_at
+        })
+
+    return clean_articles
 
 
 
