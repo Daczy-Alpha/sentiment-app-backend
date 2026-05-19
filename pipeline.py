@@ -7,9 +7,10 @@ import sqlite3
 import datetime
 from database import DB_PATH
 
-model_name = "ProsusAI/finbert"
-tokenizer = BertTokenizer.from_pretrained(model_name)
-model = BertForSequenceClassification.from_pretrained(model_name)
+MODEL_PATH = "/app/models/finbert"
+
+tokenizer = BertTokenizer.from_pretrained(MODEL_PATH, local_files_only=True)
+model = BertForSequenceClassification.from_pretrained(MODEL_PATH, local_files_only=True)
 
 
 load_dotenv()
