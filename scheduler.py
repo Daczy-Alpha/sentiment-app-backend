@@ -1,14 +1,26 @@
 from apscheduler.schedulers.blocking import BlockingScheduler
 from pipeline import fetch_score_and_store
 from database import init_db
+import traceback
 
-init_db()
-
-scheduler = BlockingScheduler()
-
-scheduler.add_job(fetch_score_and_store, 'interval', minutes=60)
+def safe_fetch():
+    try:
+        fetch_score_and_store()
+    except Exception:
+        print("Scheduler job failed, but pod will continue running.")
+        traceback.print_exc()
 
 if __name__ == "__main__":
-    print("Scheduler started...")
-    fetch_score_and_store()   # optional immediate first run
+    init_db()
+
+    scheduler = BlockingScheduler()
+
+    scheduler.add_job(
+        safe_fetch,
+        "interval",
+        minutes=60,
+        next_run_time=None
+    )
+
+    print("Scheduler started. First fetch will run after 60 minutes.")
     scheduler.start()

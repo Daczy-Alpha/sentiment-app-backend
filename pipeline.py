@@ -9,8 +9,14 @@ from database import DB_PATH
 
 MODEL_PATH = "/app/models/finbert"
 
-tokenizer = BertTokenizer.from_pretrained(MODEL_PATH, local_files_only=True)
-model = BertForSequenceClassification.from_pretrained(MODEL_PATH, local_files_only=True)
+tokenizer = None
+model = None
+
+def load_model():
+    global tokenizer, model
+    if tokenizer is None or model is None:
+        tokenizer = BertTokenizer.from_pretrained(MODEL_PATH, local_files_only=True)
+        model = BertForSequenceClassification.from_pretrained(MODEL_PATH, local_files_only=True)
 
 
 load_dotenv()
@@ -29,7 +35,16 @@ def score_headline(text: str) -> dict:
   Returns:
     A dictionary containing the sentiment label and score.
   """
-  token_ID = tokenizer(text, return_tensors="pt", padding=True, truncation=True)
+
+  # Lazy-load model only when needed
+  load_model()
+
+  token_ID = tokenizer(
+      text,
+      return_tensors="pt",
+      padding=True,
+      truncation=True
+  )
   with torch.no_grad():
     output = model(**token_ID)
   logits = output.logits
@@ -49,31 +64,33 @@ def score_headline(text: str) -> dict:
 
 
 def fetch_headlines() -> list:
-  """
-  Fetches financial headlines from NewsAPI and returns them as a list of dictionaries.
-  Args:
-    None
-  Returns:
-    A list of dictionaries containing the source name, headline, and published date.
-  """
-  response = requests.get(URL)
-  articles_data = response.json()["articles"]
+    if not NEWS_API_KEY:
+        print("NEWS_API_KEY is missing.")
+        return []
 
-  clean_articles = []
-  for article in articles_data:
-    title = article.get("title") # Get title first to check condition
-    if title is None or title == "N/A":
-      continue # Skip if title is None or "N/A"
+    try:
+        response = requests.get(URL, timeout=20)
+        response.raise_for_status()
+        data = response.json()
+    except Exception as e:
+        print(f"NewsAPI fetch failed: {e}")
+        return []
 
-    source_name = article.get("source", {}).get("name", "N/A")
-    published_at = article.get("publishedAt", "N/A")
+    articles_data = data.get("articles", [])
 
-    clean_articles.append({
-        "source": source_name,
-        "headline": title,
-        "published_at": published_at
-    })
-  return clean_articles
+    clean_articles = []
+    for article in articles_data:
+        title = article.get("title")
+        if not title or title == "N/A":
+            continue
+
+        clean_articles.append({
+            "source": article.get("source", {}).get("name", "N/A"),
+            "headline": title,
+            "published_at": article.get("publishedAt", "N/A")
+        })
+
+    return clean_articles
 
 
 
