@@ -17,7 +17,7 @@ def load_model():
     if tokenizer is None or model is None:
         tokenizer = BertTokenizer.from_pretrained(MODEL_PATH, local_files_only=True)
         model = BertForSequenceClassification.from_pretrained(MODEL_PATH, local_files_only=True)
-
+    return tokenizer, model
 
 load_dotenv()
 NEWS_API_KEY = os.environ.get("NEWS_API_KEY")
@@ -37,7 +37,7 @@ def score_headline(text: str) -> dict:
   """
 
   # Lazy-load model only when needed
-  load_model()
+  tokenizer, model = load_model()
 
   token_ID = tokenizer(
       text,
@@ -127,7 +127,7 @@ def store_article(headline: str, source: str, label: str, positive: float, negat
     Returns:
         None
     """
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     cursor = conn.cursor()
     cursor.execute("""
     INSERT OR IGNORE INTO articles (headline, source, label, positive, negative, neutral, published_at)
