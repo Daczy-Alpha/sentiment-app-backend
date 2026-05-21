@@ -1,8 +1,6 @@
 FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1
-ENV TRANSFORMERS_OFFLINE=1
-ENV HF_HUB_OFFLINE=1
 
 WORKDIR /app
 
@@ -21,6 +19,9 @@ RUN mkdir -p /app/models/finbert /app/data
 RUN python -c "from transformers import BertTokenizer, BertForSequenceClassification; \
 BertTokenizer.from_pretrained('ProsusAI/finbert').save_pretrained('/app/models/finbert'); \
 BertForSequenceClassification.from_pretrained('ProsusAI/finbert').save_pretrained('/app/models/finbert')"
+
+ENV TRANSFORMERS_OFFLINE=1
+ENV HF_HUB_OFFLINE=1
 
 COPY . .
 
