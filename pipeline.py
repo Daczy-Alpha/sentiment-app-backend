@@ -46,7 +46,7 @@ def load_model():
 load_dotenv()
 
 NEWS_API_KEY = os.environ.get("NEWS_API_KEY")
-URL = "https://newsapi.org/v2/top-headlines"
+URL = "https://newsapi.org/v2/everything"
 
 
 def score_headline(text: str) -> dict:
@@ -83,7 +83,7 @@ def score_headline(text: str) -> dict:
 
 def fetch_headlines() -> list:
     """
-    Fetches business headlines from NewsAPI.
+    Fetches fresh financial/business headlines from NewsAPI everything endpoint.
     Returns an empty list instead of crashing if the API call fails.
     """
     if not NEWS_API_KEY:
@@ -91,10 +91,11 @@ def fetch_headlines() -> list:
         return []
 
     params = {
-        "category": "business",
+        "q": "stock market OR finance OR economy OR earnings OR inflation OR Federal Reserve OR business",
         "apiKey": NEWS_API_KEY,
         "language": "en",
-        "pageSize": 50
+        "sortBy": "publishedAt",
+        "pageSize": 50,
     }
 
     try:
@@ -106,19 +107,22 @@ def fetch_headlines() -> list:
         return []
 
     articles_data = data.get("articles", [])
-
     clean_articles = []
 
     for article in articles_data:
         title = article.get("title")
+        published_at = article.get("publishedAt")
 
         if not title or title == "N/A":
+            continue
+
+        if not published_at or published_at == "N/A":
             continue
 
         clean_articles.append({
             "source": article.get("source", {}).get("name", "N/A"),
             "headline": title,
-            "published_at": article.get("publishedAt", "N/A")
+            "published_at": published_at
         })
 
     return clean_articles
@@ -145,10 +149,11 @@ def store_article(
     negative: float,
     neutral: float,
     published_at: str
-) -> None:
+) -> int:
     """
     Stores a scored article in SQLite.
-    INSERT OR IGNORE prevents duplicate headlines from crashing the job.
+    Returns 1 if a new row was inserted.
+    Returns 0 if the headline already existed and was ignored.
     """
     conn = sqlite3.connect(DB_PATH, timeout=30)
 
@@ -176,6 +181,7 @@ def store_article(
         ))
 
         conn.commit()
+        return cursor.rowcount
 
     finally:
         conn.close()
@@ -183,8 +189,8 @@ def store_article(
 
 def fetch_score_and_store() -> None:
     """
-    Fetches headlines, scores them with FinBERT, and stores them in SQLite.
-    Designed to be called safely by scheduler.py.
+    Fetches headlines, scores them with FinBERT, and stores new rows in SQLite.
+    Safe for scheduler.py to call repeatedly.
     """
     headlines = fetch_headlines()
 
@@ -194,13 +200,16 @@ def fetch_score_and_store() -> None:
         print(f"[{datetime.datetime.now()}] No headlines fetched. Skipping scoring.")
         return
 
-    stored = 0
+    processed = 0
+    inserted = 0
+    duplicates = 0
+    newest_published_at = None
 
     for article in headlines:
         try:
             result = score_headline(article["headline"])
 
-            store_article(
+            row_inserted = store_article(
                 headline=article["headline"],
                 source=article["source"],
                 label=result["label"],
@@ -210,13 +219,23 @@ def fetch_score_and_store() -> None:
                 published_at=article["published_at"]
             )
 
-            stored += 1
+            processed += 1
+            inserted += row_inserted
+
+            if row_inserted == 0:
+                duplicates += 1
+
+            if newest_published_at is None or article["published_at"] > newest_published_at:
+                newest_published_at = article["published_at"]
 
         except Exception as e:
             print(f"Failed to score/store article: {article.get('headline')}")
             print(f"Error: {e}")
 
-    print(f"[{datetime.datetime.now()}] Stored/processed {stored} articles")
+    print(f"[{datetime.datetime.now()}] Processed {processed} headlines")
+    print(f"[{datetime.datetime.now()}] Inserted {inserted} new articles")
+    print(f"[{datetime.datetime.now()}] Ignored {duplicates} duplicate articles")
+    print(f"[{datetime.datetime.now()}] Newest fetched published_at: {newest_published_at}")
 
 
 if __name__ == "__main__":
